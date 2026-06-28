@@ -16,17 +16,6 @@ Um aplicativo desktop desenvolvido em **Python** para baixar vídeos e músicas 
 
 ---
 
-## 📷 Capturas de Tela
-
-> Adicione aqui imagens do programa.
-
-```
-images/screenshot1.png
-images/screenshot2.png
-```
-
----
-
 ## 🚀 Tecnologias Utilizadas
 
 - Python 3
@@ -42,7 +31,7 @@ images/screenshot2.png
 Clone o repositório:
 
 ```bash
-git clone https://github.com/SEU_USUARIO/YouTubeDownloader.git
+git clone https://github.com/Leonardo-Davi-2005/Youtube-Download
 ```
 
 Entre na pasta:
