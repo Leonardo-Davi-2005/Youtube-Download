@@ -46,18 +46,23 @@ def processar_fila():
             messagebox.showinfo("Finalizado", "Download concluído com sucesso!")
 
         elif tipo == "erro":
-            label_status.config(text="Erro no download.")
+            label_status.config(text="Erro.")
             botao_download.config(state="normal")
+            botao_buscar.config(state="normal")
             messagebox.showerror("Erro", dados)
 
         elif tipo == "info_video":
             label_titulo.config(text=dados["titulo"])
             label_duracao.config(text=dados["duracao"])
             combo_qualidade["values"] = dados["qualidades"]
+
             if dados["qualidades"]:
                 combo_qualidade.current(0)
+                label_status.config(text="Qualidades carregadas.")
+            else:
+                label_status.config(text="Nenhuma qualidade encontrada.")
+
             botao_buscar.config(state="normal")
-            label_status.config(text="Qualidades carregadas.")
 
     janela.after(100, processar_fila)
 
@@ -85,20 +90,26 @@ def atualizar_progresso(d):
             segundos = eta % 60
             tempo = f"Tempo restante: {minutos:02d}:{segundos:02d}"
 
-        enviar_interface("progresso", {
-            "porcentagem": porcentagem,
-            "velocidade": velocidade,
-            "tempo": tempo,
-            "status": "Baixando..."
-        })
+        enviar_interface(
+            "progresso",
+            {
+                "porcentagem": porcentagem,
+                "velocidade": velocidade,
+                "tempo": tempo,
+                "status": "Baixando...",
+            },
+        )
 
     elif d["status"] == "finished":
-        enviar_interface("progresso", {
-            "porcentagem": 100,
-            "velocidade": label_velocidade.cget("text"),
-            "tempo": "Tempo restante: 00:00",
-            "status": "Processando arquivo..."
-        })
+        enviar_interface(
+            "progresso",
+            {
+                "porcentagem": 100,
+                "velocidade": "Velocidade: --",
+                "tempo": "Tempo restante: 00:00",
+                "status": "Processando arquivo...",
+            },
+        )
 
 
 def buscar_qualidades_thread():
@@ -140,19 +151,32 @@ def buscar_qualidades():
             vistos = set()
 
             for f in info["formats"]:
-                if f.get("vcodec") != "none" and f.get("height") and f.get("ext") == "mp4":
+                if f.get("vcodec") != "none" and f.get("height"):
                     altura = f.get("height")
                     fps = f.get("fps") or ""
+                    ext = f.get("ext", "").upper()
+                    codec = f.get("vcodec", "")
 
-                    chave = f"{altura}p {fps}"
+                    chave = f"{altura}-{fps}-{ext}-{codec}"
+
                     if chave in vistos:
                         continue
 
                     vistos.add(chave)
 
                     texto = f"{f['format_id']} - {altura}p"
+
                     if fps:
                         texto += f" {fps}fps"
+
+                    texto += f" • {ext}"
+
+                    if codec:
+                        texto += f" • {codec}"
+
+                    tamanho = f.get("filesize") or f.get("filesize_approx")
+                    if tamanho:
+                        texto += f" • {tamanho / 1024 / 1024:.1f} MB"
 
                     qualidades.append(texto)
                     formatos_disponiveis.append(f["format_id"])
@@ -160,15 +184,17 @@ def buscar_qualidades():
         else:
             qualidades = ["320 kbps", "192 kbps", "128 kbps"]
 
-        enviar_interface("info_video", {
-            "titulo": titulo,
-            "duracao": duracao,
-            "qualidades": qualidades
-        })
+        enviar_interface(
+            "info_video",
+            {
+                "titulo": titulo,
+                "duracao": duracao,
+                "qualidades": qualidades,
+            },
+        )
 
     except Exception as e:
         enviar_interface("erro", str(e))
-        botao_buscar.config(state="normal")
 
 
 def baixar_thread():
@@ -189,6 +215,7 @@ def baixar():
         return
 
     pasta_destino = filedialog.askdirectory(title="Escolha onde deseja salvar")
+
     if not pasta_destino:
         return
 
@@ -207,11 +234,13 @@ def baixar():
                 "format": "bestaudio/best",
                 "outtmpl": os.path.join(pasta_destino, "%(title)s.%(ext)s"),
                 "progress_hooks": [atualizar_progresso],
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": bitrate,
-                }]
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": bitrate,
+                    }
+                ],
             }
 
         else:
@@ -247,14 +276,14 @@ style.configure(
     fieldbackground="#1e293b",
     background="#1e293b",
     foreground="white",
-    arrowcolor="white"
+    arrowcolor="white",
 )
 
 style.configure(
     "Horizontal.TProgressbar",
     troughcolor="#1e293b",
     background="#22c55e",
-    thickness=22
+    thickness=22,
 )
 
 container = tk.Frame(janela, bg="#0f172a")
@@ -265,7 +294,7 @@ titulo = tk.Label(
     text="🎬 YouTube Downloader",
     bg="#0f172a",
     fg="white",
-    font=("Segoe UI", 24, "bold")
+    font=("Segoe UI", 24, "bold"),
 )
 titulo.pack()
 
@@ -274,7 +303,7 @@ subtitulo = tk.Label(
     text="Baixe vídeos em MP4 ou músicas em MP3",
     bg="#0f172a",
     fg="#94a3b8",
-    font=("Segoe UI", 11)
+    font=("Segoe UI", 11),
 )
 subtitulo.pack(pady=(0, 15))
 
@@ -286,7 +315,7 @@ tk.Label(
     text="Link do vídeo",
     bg="#111827",
     fg="white",
-    font=("Segoe UI", 10, "bold")
+    font=("Segoe UI", 10, "bold"),
 ).pack(anchor="w")
 
 entrada_link = tk.Entry(
@@ -295,7 +324,7 @@ entrada_link = tk.Entry(
     fg="white",
     insertbackground="white",
     relief="flat",
-    font=("Segoe UI", 11)
+    font=("Segoe UI", 11),
 )
 entrada_link.pack(fill="x", ipady=10, pady=(5, 15))
 
@@ -306,7 +335,7 @@ label_titulo = tk.Label(
     fg="white",
     font=("Segoe UI", 13, "bold"),
     wraplength=700,
-    justify="left"
+    justify="left",
 )
 label_titulo.pack(anchor="w")
 
@@ -315,7 +344,7 @@ label_duracao = tk.Label(
     text="Duração: --",
     bg="#111827",
     fg="#94a3b8",
-    font=("Segoe UI", 10)
+    font=("Segoe UI", 10),
 )
 label_duracao.pack(anchor="w", pady=(5, 15))
 
@@ -330,13 +359,13 @@ tk.Label(
     text="Formato",
     bg="#111827",
     fg="white",
-    font=("Segoe UI", 10, "bold")
+    font=("Segoe UI", 10, "bold"),
 ).pack(anchor="w")
 
 combo_tipo = ttk.Combobox(
     frame_tipo,
     values=["MP4", "MP3"],
-    state="readonly"
+    state="readonly",
 )
 combo_tipo.current(0)
 combo_tipo.pack(fill="x", ipady=6, pady=(5, 0))
@@ -349,12 +378,12 @@ tk.Label(
     text="Qualidade",
     bg="#111827",
     fg="white",
-    font=("Segoe UI", 10, "bold")
+    font=("Segoe UI", 10, "bold"),
 ).pack(anchor="w")
 
 combo_qualidade = ttk.Combobox(
     frame_qualidade,
-    state="readonly"
+    state="readonly",
 )
 combo_qualidade.pack(fill="x", ipady=6, pady=(5, 0))
 
@@ -368,7 +397,7 @@ botao_buscar = tk.Button(
     font=("Segoe UI", 10, "bold"),
     padx=20,
     pady=9,
-    cursor="hand2"
+    cursor="hand2",
 )
 botao_buscar.pack(side="right", pady=(20, 0))
 
@@ -376,7 +405,7 @@ barra = ttk.Progressbar(
     card,
     orient="horizontal",
     mode="determinate",
-    style="Horizontal.TProgressbar"
+    style="Horizontal.TProgressbar",
 )
 barra.pack(fill="x", pady=(35, 8))
 
@@ -385,7 +414,7 @@ label_porcentagem = tk.Label(
     text="0%",
     bg="#111827",
     fg="#22c55e",
-    font=("Segoe UI", 13, "bold")
+    font=("Segoe UI", 13, "bold"),
 )
 label_porcentagem.pack()
 
@@ -397,7 +426,7 @@ label_velocidade = tk.Label(
     text="Velocidade: --",
     bg="#111827",
     fg="#94a3b8",
-    font=("Segoe UI", 10)
+    font=("Segoe UI", 10),
 )
 label_velocidade.pack(side="left")
 
@@ -406,7 +435,7 @@ label_tempo = tk.Label(
     text="Tempo restante: --",
     bg="#111827",
     fg="#94a3b8",
-    font=("Segoe UI", 10)
+    font=("Segoe UI", 10),
 )
 label_tempo.pack(side="right")
 
@@ -415,7 +444,7 @@ label_status = tk.Label(
     text="Aguardando link...",
     bg="#111827",
     fg="#94a3b8",
-    font=("Segoe UI", 10)
+    font=("Segoe UI", 10),
 )
 label_status.pack(pady=(0, 10))
 
@@ -431,7 +460,7 @@ botao_download = tk.Button(
     font=("Segoe UI", 16, "bold"),
     padx=40,
     pady=16,
-    cursor="hand2"
+    cursor="hand2",
 )
 botao_download.pack(fill="x", padx=25, pady=(0, 20))
 
